@@ -145,3 +145,7 @@ terraform.tfstate.*
 ethio_ingestor.session
 ethio_ingestor.session-journal
 !config/dev.yaml
+
+
+#conll
+*.conll
