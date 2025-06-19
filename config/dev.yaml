@@ -1,0 +1,11 @@
+telegram:
+  api_id: 123456            # 🔐 replace with your actual API ID in a local-only file
+  api_hash: "changeme"      # 🔐 replace with your actual API hash
+  session_name: "ethio_ingestor"
+  channels:
+    - "@shegeronlinestore"
+    - "@sululustore"
+  limit: 500
+
+data:
+  output_dir: "data"

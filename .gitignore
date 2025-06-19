@@ -18,8 +18,9 @@ mlartifacts/
 
 
 # DVC
-.dvc/
-*.dvc
+!.dvc/
+!.dvc/
+!*.dvc
 .cache/
 
 
@@ -65,6 +66,7 @@ test-results/
 *.err
 
 # Data files
+data/raw
 *.csv
 *.tsv
 *.parquet
@@ -77,6 +79,7 @@ test-results/
 *.json
 *.yaml
 *.yml
+!dvc.yaml
 
 # Secrets & credentials
 *.env
@@ -137,3 +140,8 @@ terraform.tfstate.*
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
+
+# Ignore Telethon session files
+ethio_ingestor.session
+ethio_ingestor.session-journal
+!config/dev.yaml
