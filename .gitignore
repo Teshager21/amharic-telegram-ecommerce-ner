@@ -18,8 +18,9 @@ mlartifacts/
 
 
 # DVC
-.dvc/
-*.dvc
+!.dvc/
+!.dvc/
+!*.dvc
 .cache/
 
 

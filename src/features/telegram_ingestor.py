@@ -100,12 +100,23 @@ class TelegramIngestor:
                 f.write(json.dumps(msg, ensure_ascii=False) + "\n")
         logger.info(f"✅ Saved raw messages to {raw_path}")
 
-        # Save interim CSV
+        # Save interim Parquet
         df = pd.DataFrame(all_messages)
-        interim_path = self.output_dir / "interim" / "preprocessed.csv"
+        interim_path = self.output_dir / "interim" / "preprocessed.parquet"
         interim_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(interim_path, index=False)
-        logger.info(f"✅ Saved preprocessed data to {interim_path}")
+
+        try:
+            df.to_parquet(interim_path, index=False)
+            logger.info(f"✅ Saved preprocessed data to {interim_path}")
+        except ImportError as e:
+            logger.error(
+                "❌ pyarrow or fastparquet is not installed. "
+                "Please install one to save parquet files."
+            )
+            raise e
+        except Exception as e:
+            logger.error(f"❌ Failed to save parquet file: {e}")
+            raise e
 
 
 @hydra.main(config_path="../../config", config_name="dev", version_base="1.3")
