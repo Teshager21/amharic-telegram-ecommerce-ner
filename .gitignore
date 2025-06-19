@@ -79,6 +79,7 @@ data/raw
 *.json
 *.yaml
 *.yml
+!dvc.yaml
 
 # Secrets & credentials
 *.env

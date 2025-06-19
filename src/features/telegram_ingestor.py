@@ -19,6 +19,8 @@ from typing import List, Dict, Optional
 from telethon.sync import TelegramClient
 from telethon.tl.types import MessageMediaPhoto
 
+# from telethon.utils import pack_bot_file_id
+
 import pandas as pd
 import re
 import unicodedata
@@ -60,12 +62,25 @@ class TelegramIngestor:
     def scrape_channel(self, channel: str, limit: int = 1000) -> List[Dict]:
         logger.info(f"📥 Scraping channel: {channel}")
         messages = []
+        media_dir = self.output_dir / "raw" / "media"
+        media_dir.mkdir(parents=True, exist_ok=True)
 
         for message in self.client.iter_messages(channel, limit=limit):
-            if not message.text:
+            if not message.text and not message.media:
                 continue
 
-            norm_text = self.normalize_amharic(message.text)
+            norm_text = self.normalize_amharic(message.text or "")
+            has_photo = isinstance(message.media, MessageMediaPhoto)
+            image_path = None
+
+            if has_photo:
+                try:
+                    image_path = media_dir / f"{message.id}.jpg"
+                    self.client.download_media(message, file=image_path)
+                except Exception as e:
+                    logger.warning(
+                        f"⚠️ Failed to download image for message {message.id}: {e}"
+                    )
 
             messages.append(
                 {
@@ -74,7 +89,8 @@ class TelegramIngestor:
                     "sender": str(message.sender_id),
                     "text": norm_text,
                     "views": message.views or 0,
-                    "has_photo": isinstance(message.media, MessageMediaPhoto),
+                    "has_photo": has_photo,
+                    "image_path": str(image_path) if image_path else None,
                     "channel": channel,
                 }
             )
