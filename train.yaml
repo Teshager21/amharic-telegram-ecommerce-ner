@@ -1,0 +1,21 @@
+# config/train.yaml
+
+model:
+  name_or_path: xlm-roberta-base
+  max_length: 128
+
+data:
+  conll_file: data/labeled/train.conll
+
+training:
+  epochs: 3
+  batch_size: 16
+  learning_rate: 5e-5
+  label_all_tokens: true
+  evaluation_strategy: epoch
+  seed: 42
+
+output_dir: models/ner
+
+logging:
+  level: INFO

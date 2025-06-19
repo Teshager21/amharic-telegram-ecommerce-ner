@@ -1,0 +1,5 @@
+outs:
+- md5: 4f3958c9384336492cfb0ae1ca309814
+  size: 2258645
+  hash: md5
+  path: train.conll

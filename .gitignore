@@ -66,7 +66,20 @@ test-results/
 *.err
 
 # Data files
-data/raw
+data/*
+!data/.gitkeep
+!data/**/
+!data/**/.gitkeep
+!data/**/*.dvc
+!data/**/*.parquet.dvc
+!data/*.dvc
+data/raw/*
+!data/raw/*.dvc
+!data/raw/.gitkeep
+!data/processed/*.parquet.dvc
+!data/processed/.gitkeep
+!data/interim/.gitkeep
+# Ignore specific file types (optional redundancy with above)
 *.csv
 *.tsv
 *.parquet
@@ -79,7 +92,10 @@ data/raw
 *.json
 *.yaml
 *.yml
+
+# But keep DVC pipeline file
 !dvc.yaml
+
 
 # Secrets & credentials
 *.env
@@ -145,6 +161,7 @@ terraform.tfstate.*
 ethio_ingestor.session
 ethio_ingestor.session-journal
 !config/dev.yaml
+!train.yaml
 
 
 #conll
