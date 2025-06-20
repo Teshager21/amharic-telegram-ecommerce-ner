@@ -16,7 +16,7 @@ import sys
 from omegaconf import DictConfig
 import hydra
 
-from conll_loader import load_conll_data
+from data.conll_loader import load_conll_data
 from tokenizer_utils import prepare_tokenizer_and_align_labels
 from trainer import NERTrainer
 
