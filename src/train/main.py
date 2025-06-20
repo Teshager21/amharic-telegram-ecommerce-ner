@@ -39,7 +39,7 @@ def main(cfg: DictConfig) -> None:
     logger.info(f"📥 Loading training CoNLL data from: {train_data_path}")
     train_df = load_conll_data(train_data_path)
 
-    # Load eval data if provided, else None
+    # Load eval data if provided
     eval_df = None
     if "eval_file" in cfg.data and cfg.data.eval_file:
         eval_data_path = Path(cfg.data.eval_file)
@@ -48,17 +48,17 @@ def main(cfg: DictConfig) -> None:
     else:
         logger.warning("⚠️ No evaluation dataset provided; evaluation will be skipped.")
 
-    # Build label2id mapping from train data unique labels
+    # Build label2id mapping
     unique_labels = sorted(set(train_df["label"].unique()))
     label2id = {label: i for i, label in enumerate(unique_labels)}
     id2label = {i: label for label, i in label2id.items()}
     logger.info(f"🔖 Label to ID mapping: {label2id}")
 
-    # Load tokenizer early (needed in prepare_dataset)
+    # Load tokenizer
     logger.info(f"🔧 Loading tokenizer for model: {cfg.model.name_or_path}")
     tokenizer = AutoTokenizer.from_pretrained(cfg.model.name_or_path)
 
-    # Helper function to prepare HF dataset from dataframe
+    # Prepare HF dataset
     def prepare_dataset(df):
         texts = df.groupby("sentence_id")["token"].apply(list).tolist()
         labels_str = df.groupby("sentence_id")["label"].apply(list).tolist()
@@ -77,11 +77,10 @@ def main(cfg: DictConfig) -> None:
             }
         )
 
-    # Prepare datasets
     train_dataset = prepare_dataset(train_df)
     eval_dataset = prepare_dataset(eval_df) if eval_df is not None else None
 
-    # Load model with proper label mapping
+    # Load model
     logger.info(f"🔧 Loading model for token classification: {cfg.model.name_or_path}")
     model = AutoModelForTokenClassification.from_pretrained(
         cfg.model.name_or_path,
@@ -99,14 +98,14 @@ def main(cfg: DictConfig) -> None:
         "seed": cfg.training.seed,
     }
 
-    # Add eval strategy only if eval dataset is available
-    if eval_dataset is not None:
-        training_args_dict["eval_strategy"] = cfg.training.eval_strategy
+    # ✅ Translate custom eval_strategy to HF's evaluation_strategy
+    if eval_dataset is not None and "eval_strategy" in cfg.training:
+        training_args_dict["evaluation_strategy"] = cfg.training.eval_strategy
         training_args_dict["load_best_model_at_end"] = True
         training_args_dict["metric_for_best_model"] = "f1"
         training_args_dict["greater_is_better"] = True
 
-    # Initialize trainer
+    # Initialize and run trainer
     trainer = NERTrainer(
         model=model,
         tokenizer=tokenizer,
@@ -116,12 +115,10 @@ def main(cfg: DictConfig) -> None:
         training_args_dict=training_args_dict,
     )
 
-    # Train and evaluate
     trainer.train()
     if eval_dataset is not None:
         trainer.evaluate()
 
-    # Save model
     trainer.save_model()
     logger.info("✅ NER fine-tuning completed successfully.")
 

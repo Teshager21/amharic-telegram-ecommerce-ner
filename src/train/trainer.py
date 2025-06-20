@@ -2,7 +2,7 @@
 NER Model Training Module with Hugging Face Trainer and MLflow integration.
 
 Author: Teshager Admasu
-Date: 2025-06-19
+Date: 2025-06-20
 """
 
 import logging
@@ -40,9 +40,10 @@ class NERTrainer:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Base/default training arguments
         default_args = {
             "output_dir": str(self.output_dir),
-            "eval_strategy": "epoch",  # correct key, not evaluation_strategy
+            "evaluation_strategy": "epoch",
             "save_strategy": "epoch",
             "logging_strategy": "steps",
             "logging_steps": 100,
@@ -52,14 +53,25 @@ class NERTrainer:
             "per_device_eval_batch_size": 16,
             "learning_rate": 5e-5,
             "weight_decay": 0.01,
-            "load_best_model_at_end": True,
-            "metric_for_best_model": "f1",
-            "greater_is_better": True,
             "seed": 42,
         }
 
+        # Include evaluation-related settings only if eval set is provided
+        if eval_dataset is not None:
+            default_args.update(
+                {
+                    "load_best_model_at_end": True,
+                    "metric_for_best_model": "f1",
+                    "greater_is_better": True,
+                }
+            )
+
+        # Map any custom keys from Hydra config
         if training_args_dict:
-            # Just update default args directly, no warning needed
+            if "eval_strategy" in training_args_dict:
+                training_args_dict["evaluation_strategy"] = training_args_dict.pop(
+                    "eval_strategy"
+                )
             default_args.update(training_args_dict)
 
         self.training_args = TrainingArguments(**default_args)
@@ -72,7 +84,7 @@ class NERTrainer:
             eval_dataset=self.eval_dataset,
             tokenizer=self.tokenizer,
             data_collator=self.data_collator,
-            compute_metrics=self.compute_metrics,
+            compute_metrics=self.compute_metrics if eval_dataset else None,
         )
 
         self.mlflow_experiment_name = mlflow_experiment_name or "NER_Training"
@@ -80,12 +92,6 @@ class NERTrainer:
     def compute_metrics(self, p):
         """
         Compute evaluation metrics using seqeval.
-
-        Args:
-            p: EvalPrediction object.
-
-        Returns:
-            dict with precision, recall, f1, accuracy
         """
         from seqeval.metrics import (
             accuracy_score,
@@ -127,16 +133,21 @@ class NERTrainer:
         """
         mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
-            mlflow.log_params(vars(self.training_args))
-            logger.info("🚀 Starting training...")
+            # Log only relevant params to avoid HF TrainingArguments duplication
+            mlflow.log_param("epochs", self.training_args.num_train_epochs)
+            mlflow.log_param("learning_rate", self.training_args.learning_rate)
+            mlflow.log_param(
+                "train_batch_size", self.training_args.per_device_train_batch_size
+            )
 
+            logger.info("🚀 Starting training...")
             train_result = self.trainer.train()
             self.trainer.save_model()
+
             mlflow.log_artifacts(str(self.output_dir), artifact_path="model")
 
             metrics = train_result.metrics
             mlflow.log_metrics(metrics)
-
             logger.info(f"✅ Training completed. Metrics: {metrics}")
             return metrics
 
@@ -183,8 +194,8 @@ if __name__ == "__main__":
         "--epochs", type=int, default=3, help="Number of training epochs"
     )
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
-    args = parser.parse_args()
 
+    args = parser.parse_args()
     logger.warning(
         "⚠️ This CLI mode is a template and not integrated with Hydra config."
     )
