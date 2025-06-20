@@ -54,6 +54,10 @@ def main(cfg: DictConfig) -> None:
     id2label = {i: label for label, i in label2id.items()}
     logger.info(f"🔖 Label to ID mapping: {label2id}")
 
+    # Load tokenizer early (needed in prepare_dataset)
+    logger.info(f"🔧 Loading tokenizer for model: {cfg.model.name_or_path}")
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model.name_or_path)
+
     # Helper function to prepare HF dataset from dataframe
     def prepare_dataset(df):
         texts = df.groupby("sentence_id")["token"].apply(list).tolist()
@@ -72,10 +76,6 @@ def main(cfg: DictConfig) -> None:
                 "labels": aligned_labels,
             }
         )
-
-    # Load tokenizer
-    logger.info(f"🔧 Loading tokenizer for model: {cfg.model.name_or_path}")
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model.name_or_path)
 
     # Prepare datasets
     train_dataset = prepare_dataset(train_df)
@@ -101,7 +101,7 @@ def main(cfg: DictConfig) -> None:
 
     # Add eval strategy only if eval dataset is available
     if eval_dataset is not None:
-        training_args_dict["evaluation_strategy"] = cfg.training.eval_strategy
+        training_args_dict["eval_strategy"] = cfg.training.eval_strategy
         training_args_dict["load_best_model_at_end"] = True
         training_args_dict["metric_for_best_model"] = "f1"
         training_args_dict["greater_is_better"] = True
