@@ -1,6 +1,7 @@
 # src/train/trainer.py
 """
 NER Model Training Module with Hugging Face Trainer and MLflow integration.
+
 Author: Teshager Admasu
 Date: 2025-06-19
 """
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 import mlflow
+import datasets
 from transformers import (
     Trainer,
     TrainingArguments,
@@ -17,7 +19,6 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
-import datasets
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,8 @@ class NERTrainer:
 
         default_args = {
             "output_dir": str(self.output_dir),
-            "evaluation_strategy": "epoch",  # ✅ added explicitly
-            "save_strategy": "epoch",  # ✅ added explicitly
+            "eval_strategy": "epoch",  # <-- renamed from evaluation_strategy
+            "save_strategy": "epoch",
             "logging_strategy": "steps",
             "logging_steps": 100,
             "save_total_limit": 2,
@@ -59,16 +60,14 @@ class NERTrainer:
         }
 
         if training_args_dict:
+            # Warn if unsupported args are passed
+            unsupported = {
+                "evaluation_strategy",
+                "save_strategy",
+            } & training_args_dict.keys()
+            if unsupported:
+                logger.warning(f"⚠️ Unsupported TrainingArguments keys: {unsupported}")
             default_args.update(training_args_dict)
-
-        # Optional debugging: warn on unsupported keys
-        from inspect import signature
-
-        unsupported = [
-            k for k in default_args if k not in signature(TrainingArguments).parameters
-        ]
-        if unsupported:
-            logger.warning(f"⚠️ Unsupported TrainingArguments keys: {unsupported}")
 
         self.training_args = TrainingArguments(**default_args)
         self.data_collator = DataCollatorForTokenClassification(tokenizer)
@@ -86,6 +85,15 @@ class NERTrainer:
         self.mlflow_experiment_name = mlflow_experiment_name or "NER_Training"
 
     def compute_metrics(self, p):
+        """
+        Compute evaluation metrics using seqeval.
+
+        Args:
+            p: EvalPrediction object.
+
+        Returns:
+            dict with precision, recall, f1, accuracy
+        """
         from seqeval.metrics import (
             accuracy_score,
             precision_score,
@@ -110,8 +118,8 @@ class NERTrainer:
         accuracy = accuracy_score(true_labels, true_predictions)
 
         logger.info(
-            f"Evaluation — Precision: {precision:.4f}, Recall: {recall:.4f}, "
-            f"F1: {f1:.4f}, Accuracy: {accuracy:.4f}"
+            f"📊 Eval — Precision: {precision:.4f}, Recall: "
+            f"{recall:.4f}, F1: {f1:.4f}, Accuracy: {accuracy:.4f}"
         )
         return {
             "precision": precision,
@@ -121,6 +129,9 @@ class NERTrainer:
         }
 
     def train(self):
+        """
+        Train the model and log with MLflow.
+        """
         mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
             mlflow.log_params(vars(self.training_args))
@@ -133,15 +144,50 @@ class NERTrainer:
             metrics = train_result.metrics
             mlflow.log_metrics(metrics)
 
-            logger.info(f"✅ Training finished. Metrics: {metrics}")
+            logger.info(f"✅ Training completed. Metrics: {metrics}")
             return metrics
 
     def evaluate(self):
+        """
+        Evaluate the model on the evaluation dataset.
+        """
         logger.info("🧪 Running evaluation...")
         metrics = self.trainer.evaluate()
         logger.info(f"📊 Evaluation metrics: {metrics}")
         return metrics
 
     def save_model(self):
+        """
+        Save model to output directory.
+        """
         logger.info(f"💾 Saving model to {self.output_dir}")
         self.trainer.save_model(self.output_dir)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    logging.basicConfig(level=logging.INFO, format="🔥 [%(levelname)s] %(message)s")
+
+    parser = argparse.ArgumentParser(
+        description="Train NER model with Hugging Face Trainer + MLflow"
+    )
+    parser.add_argument(
+        "--train_file", type=str, required=True, help="Path to training dataset"
+    )
+    parser.add_argument("--eval_file", type=str, help="Path to evaluation dataset")
+    parser.add_argument(
+        "--model_name", type=str, default="xlm-roberta-base", help="Model name"
+    )
+    parser.add_argument(
+        "--output_dir", type=str, default="models/ner", help="Output directory"
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=3, help="Number of training epochs"
+    )
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    args = parser.parse_args()
+
+    logger.warning(
+        "⚠️ This CLI mode is a template and not integrated with Hydra config."
+    )

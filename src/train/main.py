@@ -95,7 +95,7 @@ def main(cfg: DictConfig) -> None:
             "learning_rate": cfg.training.learning_rate,
             "per_device_train_batch_size": cfg.training.batch_size,
             "per_device_eval_batch_size": cfg.training.batch_size,
-            "evaluation_strategy": cfg.training.evaluation_strategy,
+            "eval_strategy": cfg.training.eval_strategy,
             "seed": cfg.training.seed,
         },
     )

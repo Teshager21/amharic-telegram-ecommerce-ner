@@ -12,7 +12,7 @@ training:
   batch_size: 16
   learning_rate: 5e-5
   label_all_tokens: true
-  evaluation_strategy: epoch
+  eval_strategy: epoch
   seed: 42
 
 output_dir: models/ner
