@@ -5,7 +5,8 @@ model:
   max_length: 128
 
 data:
-  conll_file: data/labeled/train.conll
+  train_file: data/labeled/train_split.conll
+  eval_file: data/labeled/eval_split.conll
 
 training:
   epochs: 3

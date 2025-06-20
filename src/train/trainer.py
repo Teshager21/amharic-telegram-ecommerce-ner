@@ -1,4 +1,3 @@
-# src/train/trainer.py
 """
 NER Model Training Module with Hugging Face Trainer and MLflow integration.
 
@@ -43,7 +42,7 @@ class NERTrainer:
 
         default_args = {
             "output_dir": str(self.output_dir),
-            "eval_strategy": "epoch",  # <-- renamed from evaluation_strategy
+            "eval_strategy": "epoch",  # correct key, not evaluation_strategy
             "save_strategy": "epoch",
             "logging_strategy": "steps",
             "logging_steps": 100,
@@ -60,13 +59,7 @@ class NERTrainer:
         }
 
         if training_args_dict:
-            # Warn if unsupported args are passed
-            unsupported = {
-                "evaluation_strategy",
-                "save_strategy",
-            } & training_args_dict.keys()
-            if unsupported:
-                logger.warning(f"⚠️ Unsupported TrainingArguments keys: {unsupported}")
+            # Just update default args directly, no warning needed
             default_args.update(training_args_dict)
 
         self.training_args = TrainingArguments(**default_args)
@@ -151,6 +144,10 @@ class NERTrainer:
         """
         Evaluate the model on the evaluation dataset.
         """
+        if self.eval_dataset is None:
+            logger.warning("⚠️ No evaluation dataset provided, skipping evaluation.")
+            return None
+
         logger.info("🧪 Running evaluation...")
         metrics = self.trainer.evaluate()
         logger.info(f"📊 Evaluation metrics: {metrics}")

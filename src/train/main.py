@@ -34,45 +34,52 @@ def main(cfg: DictConfig) -> None:
 
     logger.info("🚀 Starting NER fine-tuning pipeline")
 
-    # Load labeled CoNLL data
-    data_path = Path(cfg.data.conll_file)
-    logger.info(f"📥 Loading CoNLL data from: {data_path}")
-    df = load_conll_data(data_path)
+    # Load train data
+    train_data_path = Path(cfg.data.train_file)
+    logger.info(f"📥 Loading training CoNLL data from: {train_data_path}")
+    train_df = load_conll_data(train_data_path)
+
+    # Load eval data if provided, else None
+    eval_df = None
+    if "eval_file" in cfg.data and cfg.data.eval_file:
+        eval_data_path = Path(cfg.data.eval_file)
+        logger.info(f"📥 Loading evaluation CoNLL data from: {eval_data_path}")
+        eval_df = load_conll_data(eval_data_path)
+    else:
+        logger.warning("⚠️ No evaluation dataset provided; evaluation will be skipped.")
+
+    # Build label2id mapping from train data unique labels
+    unique_labels = sorted(set(train_df["label"].unique()))
+    label2id = {label: i for i, label in enumerate(unique_labels)}
+    id2label = {i: label for label, i in label2id.items()}
+    logger.info(f"🔖 Label to ID mapping: {label2id}")
+
+    # Helper function to prepare HF dataset from dataframe
+    def prepare_dataset(df):
+        texts = df.groupby("sentence_id")["token"].apply(list).tolist()
+        labels_str = df.groupby("sentence_id")["label"].apply(list).tolist()
+        labels = [[label2id[label] for label in seq] for seq in labels_str]
+        input_ids, aligned_labels = prepare_tokenizer_and_align_labels(
+            texts=texts,
+            labels=labels,
+            tokenizer=tokenizer,
+            label_all_tokens=cfg.training.label_all_tokens,
+            max_length=cfg.model.max_length,
+        )
+        return Dataset.from_dict(
+            {
+                "input_ids": input_ids,
+                "labels": aligned_labels,
+            }
+        )
 
     # Load tokenizer
     logger.info(f"🔧 Loading tokenizer for model: {cfg.model.name_or_path}")
     tokenizer = AutoTokenizer.from_pretrained(cfg.model.name_or_path)
 
-    # Build label2id mapping from unique labels in the dataset
-    unique_labels = sorted(set(df["label"].unique()))
-    label2id = {label: i for i, label in enumerate(unique_labels)}
-    id2label = {i: label for label, i in label2id.items()}
-    logger.info(f"🔖 Label to ID mapping: {label2id}")
-
-    # Group tokens and string labels by sentence
-    texts = df.groupby("sentence_id")["token"].apply(list).tolist()
-    labels_str = df.groupby("sentence_id")["label"].apply(list).tolist()
-
-    # Convert string labels to integer IDs
-    labels = [[label2id[label] for label in seq] for seq in labels_str]
-
-    # Prepare tokenizer and align labels (integer IDs)
-    logger.info("🔧 Preparing tokenizer and aligning labels")
-    input_ids, aligned_labels = prepare_tokenizer_and_align_labels(
-        texts=texts,
-        labels=labels,
-        tokenizer=tokenizer,
-        label_all_tokens=cfg.training.label_all_tokens,
-        max_length=cfg.model.max_length,
-    )
-
-    # Create Hugging Face Dataset object for trainer
-    dataset = Dataset.from_dict(
-        {
-            "input_ids": input_ids,
-            "labels": aligned_labels,
-        }
-    )
+    # Prepare datasets
+    train_dataset = prepare_dataset(train_df)
+    eval_dataset = prepare_dataset(eval_df) if eval_df is not None else None
 
     # Load model with proper label mapping
     logger.info(f"🔧 Loading model for token classification: {cfg.model.name_or_path}")
@@ -83,26 +90,36 @@ def main(cfg: DictConfig) -> None:
         label2id=label2id,
     )
 
+    # Prepare training arguments dictionary
+    training_args_dict = {
+        "num_train_epochs": cfg.training.epochs,
+        "learning_rate": cfg.training.learning_rate,
+        "per_device_train_batch_size": cfg.training.batch_size,
+        "per_device_eval_batch_size": cfg.training.batch_size,
+        "seed": cfg.training.seed,
+    }
+
+    # Add eval strategy only if eval dataset is available
+    if eval_dataset is not None:
+        training_args_dict["evaluation_strategy"] = cfg.training.eval_strategy
+        training_args_dict["load_best_model_at_end"] = True
+        training_args_dict["metric_for_best_model"] = "f1"
+        training_args_dict["greater_is_better"] = True
+
     # Initialize trainer
     trainer = NERTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=dataset,
-        eval_dataset=None,  # Add eval dataset if available
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         output_dir=Path(cfg.output_dir),
-        training_args_dict={
-            "num_train_epochs": cfg.training.epochs,
-            "learning_rate": cfg.training.learning_rate,
-            "per_device_train_batch_size": cfg.training.batch_size,
-            "per_device_eval_batch_size": cfg.training.batch_size,
-            "eval_strategy": cfg.training.eval_strategy,
-            "seed": cfg.training.seed,
-        },
+        training_args_dict=training_args_dict,
     )
 
     # Train and evaluate
     trainer.train()
-    trainer.evaluate()
+    if eval_dataset is not None:
+        trainer.evaluate()
 
     # Save model
     trainer.save_model()
