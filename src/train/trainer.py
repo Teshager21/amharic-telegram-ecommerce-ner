@@ -43,7 +43,7 @@ class NERTrainer:
         # Base/default training arguments
         default_args = {
             "output_dir": str(self.output_dir),
-            "evaluation_strategy": "epoch",
+            "eval_strategy": "epoch",  # <-- Use eval_strategy here
             "save_strategy": "epoch",
             "logging_strategy": "steps",
             "logging_steps": 100,
@@ -66,12 +66,9 @@ class NERTrainer:
                 }
             )
 
-        # Map any custom keys from Hydra config
+        # Update default_args with any user-provided args
         if training_args_dict:
-            if "eval_strategy" in training_args_dict:
-                training_args_dict["evaluation_strategy"] = training_args_dict.pop(
-                    "eval_strategy"
-                )
+            # Directly update without converting keys
             default_args.update(training_args_dict)
 
         self.training_args = TrainingArguments(**default_args)
@@ -133,7 +130,6 @@ class NERTrainer:
         """
         mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
-            # Log only relevant params to avoid HF TrainingArguments duplication
             mlflow.log_param("epochs", self.training_args.num_train_epochs)
             mlflow.log_param("learning_rate", self.training_args.learning_rate)
             mlflow.log_param(

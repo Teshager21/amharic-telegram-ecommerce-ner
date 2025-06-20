@@ -98,9 +98,11 @@ def main(cfg: DictConfig) -> None:
         "seed": cfg.training.seed,
     }
 
-    # ✅ Translate custom eval_strategy to HF's evaluation_strategy
+    # Use only eval_strategy (not evaluation_strategy)
     if eval_dataset is not None and "eval_strategy" in cfg.training:
-        training_args_dict["evaluation_strategy"] = cfg.training.eval_strategy
+        training_args_dict["eval_strategy"] = (
+            cfg.training.eval_strategy
+        )  # Use only eval_strategy here
         training_args_dict["load_best_model_at_end"] = True
         training_args_dict["metric_for_best_model"] = "f1"
         training_args_dict["greater_is_better"] = True
