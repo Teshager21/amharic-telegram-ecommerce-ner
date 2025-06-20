@@ -1,4 +1,3 @@
-# src/train/tokenizer_utils.py
 """
 Tokenization and Label Alignment Utilities for NER Fine-Tuning.
 
@@ -12,19 +11,21 @@ from transformers import PreTrainedTokenizerBase
 
 def prepare_tokenizer_and_align_labels(
     texts: List[List[str]],
-    labels: List[List[str]],
+    labels: List[List[int]],
     tokenizer: PreTrainedTokenizerBase,
     label_all_tokens: bool = True,
+    max_length: int = 128,
 ) -> Tuple[List[List[int]], List[List[int]]]:
     """
     Tokenize input texts and align labels with the tokenized output for NER tasks.
 
     Args:
         texts (List[List[str]]): List of tokenized sentences (list of tokens).
-        labels (List[List[str]]): Corresponding list of BIO labels for each token.
+        labels (List[List[int]]): Corresponding list of label IDs for each token.
         tokenizer (PreTrainedTokenizerBase): Hugging Face tokenizer instance.
         label_all_tokens (bool): If True, label all subtokens with the original
-        label; else, label only first subtoken.
+            label; else, label only first subtoken.
+        max_length (int): Maximum sequence length for tokenization.
 
     Returns:
         Tuple[List[List[int]], List[List[int]]]:
@@ -34,7 +35,8 @@ def prepare_tokenizer_and_align_labels(
         texts,
         is_split_into_words=True,
         truncation=True,
-        padding=False,
+        padding="max_length",
+        max_length=max_length,
         return_tensors=None,
     )
 

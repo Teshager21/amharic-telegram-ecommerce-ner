@@ -42,8 +42,8 @@ class NERTrainer:
 
         default_args = {
             "output_dir": str(self.output_dir),
-            "evaluation_strategy": "epoch",
-            "save_strategy": "epoch",
+            "evaluation_strategy": "epoch",  # ✅ added explicitly
+            "save_strategy": "epoch",  # ✅ added explicitly
             "logging_strategy": "steps",
             "logging_steps": 100,
             "save_total_limit": 2,
@@ -57,8 +57,18 @@ class NERTrainer:
             "greater_is_better": True,
             "seed": 42,
         }
+
         if training_args_dict:
             default_args.update(training_args_dict)
+
+        # Optional debugging: warn on unsupported keys
+        from inspect import signature
+
+        unsupported = [
+            k for k in default_args if k not in signature(TrainingArguments).parameters
+        ]
+        if unsupported:
+            logger.warning(f"⚠️ Unsupported TrainingArguments keys: {unsupported}")
 
         self.training_args = TrainingArguments(**default_args)
         self.data_collator = DataCollatorForTokenClassification(tokenizer)
@@ -76,16 +86,6 @@ class NERTrainer:
         self.mlflow_experiment_name = mlflow_experiment_name or "NER_Training"
 
     def compute_metrics(self, p):
-        """
-        Compute metrics function called during evaluation.
-        Uses seqeval metric for token classification.
-
-        Args:
-            p: EvalPrediction object with predictions and label_ids.
-
-        Returns:
-            dict: metrics including precision, recall, f1, accuracy
-        """
         from seqeval.metrics import (
             accuracy_score,
             precision_score,
@@ -99,11 +99,10 @@ class NERTrainer:
         true_labels = [
             [label for label in label_seq if label != -100] for label_seq in labels
         ]
-        true_predictions = []
-        for pred_seq, label_seq in zip(predictions, labels):
-            true_predictions.append(
-                [p for p, l in zip(pred_seq, label_seq) if l != -100]
-            )
+        true_predictions = [
+            [p for p, l in zip(pred_seq, label_seq) if l != -100]
+            for pred_seq, label_seq in zip(predictions, labels)
+        ]
 
         precision = precision_score(true_labels, true_predictions)
         recall = recall_score(true_labels, true_predictions)
@@ -111,8 +110,8 @@ class NERTrainer:
         accuracy = accuracy_score(true_labels, true_predictions)
 
         logger.info(
-            f"Evaluation — Precision: {precision:.4f}, "
-            f"Recall: {recall:.4f}, F1: {f1:.4f}, Accuracy: {accuracy:.4f}"
+            f"Evaluation — Precision: {precision:.4f}, Recall: {recall:.4f}, "
+            f"F1: {f1:.4f}, Accuracy: {accuracy:.4f}"
         )
         return {
             "precision": precision,
@@ -122,9 +121,6 @@ class NERTrainer:
         }
 
     def train(self):
-        """
-        Run training and log parameters/metrics/artifacts to MLflow.
-        """
         mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
             mlflow.log_params(vars(self.training_args))
@@ -140,37 +136,12 @@ class NERTrainer:
             logger.info(f"✅ Training finished. Metrics: {metrics}")
             return metrics
 
+    def evaluate(self):
+        logger.info("🧪 Running evaluation...")
+        metrics = self.trainer.evaluate()
+        logger.info(f"📊 Evaluation metrics: {metrics}")
+        return metrics
 
-if __name__ == "__main__":
-    import argparse
-    import datasets
-
-    logging.basicConfig(level=logging.INFO, format="🔥 [%(levelname)s] %(message)s")
-
-    parser = argparse.ArgumentParser(
-        description="Train NER model with Hugging Face Trainer + MLflow"
-    )
-    parser.add_argument(
-        "--train_file", type=str, required=True, help="Path to training dataset"
-    )
-    parser.add_argument(
-        "--eval_file", type=str, required=False, help="Path to evaluation dataset"
-    )
-    parser.add_argument(
-        "--model_name",
-        type=str,
-        default="xlm-roberta-base",
-        help="Pretrained model name",
-    )
-    parser.add_argument(
-        "--output_dir", type=str, default="models/ner", help="Model output directory"
-    )
-    parser.add_argument(
-        "--epochs", type=int, default=3, help="Number of training epochs"
-    )
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
-    args = parser.parse_args()
-
-    logger.warning(
-        "⚠️ This script is a skeleton for running training with MLflow tracking."
-    )
+    def save_model(self):
+        logger.info(f"💾 Saving model to {self.output_dir}")
+        self.trainer.save_model(self.output_dir)
