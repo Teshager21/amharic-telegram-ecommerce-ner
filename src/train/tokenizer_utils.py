@@ -10,7 +10,7 @@ from typing import List, Tuple
 from transformers import PreTrainedTokenizerBase
 
 
-def tokenize_and_align_labels(
+def prepare_tokenizer_and_align_labels(
     texts: List[List[str]],
     labels: List[List[str]],
     tokenizer: PreTrainedTokenizerBase,

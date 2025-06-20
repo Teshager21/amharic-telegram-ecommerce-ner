@@ -22,7 +22,7 @@ import datasets
 logger = logging.getLogger(__name__)
 
 
-class NerTrainer:
+class NERTrainer:
     def __init__(
         self,
         model: PreTrainedModel,
