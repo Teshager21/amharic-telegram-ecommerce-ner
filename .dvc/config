@@ -3,4 +3,4 @@
 ['remote "gdrive_remote"']
     url = gdrive://1UveBgDaVcNQi1T-fLA-Kz03hPRqJ_ayk
     gdrive_use_service_account = true
-    gdrive_service_account_json_file_path = /home/teshager/.config/gdrive/dvc-drive-remote-8f00f1ce2758.json
+    gdrive_service_account_json_file_path = /content/sa_key.json
