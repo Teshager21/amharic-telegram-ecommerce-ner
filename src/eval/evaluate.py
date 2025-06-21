@@ -110,6 +110,7 @@ def evaluate(model_path: str, data_path: str, label_list: List[str]):
 
         output_path = Path("eval_report.txt")
         output_path.write_text(report)
+        mlflow.log_metric("f1", f1_score(...))
         mlflow.log_artifact(str(output_path))
 
 

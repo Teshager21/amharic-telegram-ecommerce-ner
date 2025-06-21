@@ -93,29 +93,19 @@ class NERTrainer:
             recall_score,
             f1_score,
         )
-        import torch
-        import numpy as np
 
         predictions, labels = p
-
-        # Convert predictions to tensor if it's a list or numpy array
-        if isinstance(predictions, list):
-            predictions = torch.tensor(predictions)
-        elif isinstance(predictions, np.ndarray):
-            predictions = torch.tensor(predictions)
-
         predictions = predictions.argmax(-1)
-
         id2label = self.model.config.id2label
 
         # Remove ignored index (-100) and convert to string labels
         true_labels = [
-            [id2label[label] for label in label_seq if label != -100]
+            [id2label[int(label)] for label in label_seq if label != -100]
             for label_seq in labels
         ]
         true_predictions = [
             [
-                id2label[pred.item()]
+                id2label[int(pred)]
                 for pred, label in zip(pred_seq, label_seq)
                 if label != -100
             ]
@@ -152,8 +142,12 @@ class NERTrainer:
 
             logger.info("🚀 Starting training...")
             train_result = self.trainer.train()
-            self.trainer.save_model()
 
+            # Save model and tokenizer explicitly to output_dir
+            self.trainer.save_model(str(self.output_dir))
+            self.tokenizer.save_pretrained(str(self.output_dir))
+
+            # Log model directory as MLflow artifact
             mlflow.log_artifacts(str(self.output_dir), artifact_path="model")
 
             metrics = train_result.metrics
@@ -180,6 +174,8 @@ class NERTrainer:
         """
         logger.info(f"💾 Saving model to {self.output_dir}")
         self.trainer.save_model(self.output_dir)
+        # Log model directory as artifact
+        mlflow.log_artifacts(self.output_dir, artifact_path="ner_model")
 
 
 if __name__ == "__main__":
