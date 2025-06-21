@@ -115,7 +115,7 @@ class NERTrainer:
         ]
         true_predictions = [
             [
-                id2label[pred]
+                id2label[pred.item()]
                 for pred, label in zip(pred_seq, label_seq)
                 if label != -100
             ]

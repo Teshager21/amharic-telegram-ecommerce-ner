@@ -167,3 +167,4 @@ ethio_ingestor.session-journal
 
 #conll
 *.conll
+/mlruns
