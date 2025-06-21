@@ -87,9 +87,6 @@ class NERTrainer:
         self.mlflow_experiment_name = mlflow_experiment_name or "NER_Training"
 
     def compute_metrics(self, p):
-        """
-        Compute evaluation metrics using seqeval.
-        """
         from seqeval.metrics import (
             accuracy_score,
             precision_score,
@@ -100,11 +97,19 @@ class NERTrainer:
         predictions, labels = p
         predictions = predictions.argmax(-1)
 
+        id2label = self.model.config.id2label
+
+        # Remove ignored index (-100) and convert to string labels
         true_labels = [
-            [label for label in label_seq if label != -100] for label_seq in labels
+            [id2label[label] for label in label_seq if label != -100]
+            for label_seq in labels
         ]
         true_predictions = [
-            [p for p, l in zip(pred_seq, label_seq) if l != -100]
+            [
+                id2label[pred]
+                for pred, label in zip(pred_seq, label_seq)
+                if label != -100
+            ]
             for pred_seq, label_seq in zip(predictions, labels)
         ]
 
