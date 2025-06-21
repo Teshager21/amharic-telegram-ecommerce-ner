@@ -93,8 +93,17 @@ class NERTrainer:
             recall_score,
             f1_score,
         )
+        import torch
+        import numpy as np
 
         predictions, labels = p
+
+        # Convert predictions to tensor if it's a list or numpy array
+        if isinstance(predictions, list):
+            predictions = torch.tensor(predictions)
+        elif isinstance(predictions, np.ndarray):
+            predictions = torch.tensor(predictions)
+
         predictions = predictions.argmax(-1)
 
         id2label = self.model.config.id2label
