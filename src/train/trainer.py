@@ -132,7 +132,9 @@ class NERTrainer:
         """
         Train the model and log with MLflow.
         """
-        mlflow.set_experiment(self.mlflow_experiment_name)
+        mlflow.set_experiment(
+            "NER_Training"
+        )  # 🔧 Use a valid experiment name, not "mlruns"
         with mlflow.start_run():
             mlflow.log_param("epochs", self.training_args.num_train_epochs)
             mlflow.log_param("learning_rate", self.training_args.learning_rate)
