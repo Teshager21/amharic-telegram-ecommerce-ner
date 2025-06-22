@@ -1,0 +1,5 @@
+outs:
+- md5: fb3e57dfc34ec99dbffa80a94bfc8d97
+  size: 2033069
+  hash: md5
+  path: train_split.conll

@@ -57,7 +57,6 @@ amharic-telegram-ecommerce-ner/
 ├── mlruns/ # MLflow experiment logs
 └── README.md
 
-
 ---
 
 ## 🔬 Example Entities Extracted
@@ -80,16 +79,16 @@ For each vendor:
 
 ---
 
-## 📅 Timeline
+## 📅 Timeline & Progress
 
-| Task                            | Status |
-|---------------------------------|--------|
-| ✅ Task 1: Telegram Ingestion   | In Progress |
-| ✅ Task 2: NER Labeling (CoNLL) | Pending |
-| ✅ Task 3: Model Fine-Tuning    | Pending |
-| ✅ Task 4: Model Comparison     | Pending |
-| ✅ Task 5: Interpretability     | Pending |
-| ✅ Task 6: Vendor Scorecard     | Pending |
+| Task                            | Status         | Notes on Task-3 (Model Fine-Tuning)                |
+|---------------------------------|----------------|----------------------------------------------------|
+| ✅ Task 1: Telegram Ingestion   | Completed      | Data collection from Amharic Telegram channels done |
+| ✅ Task 2: NER Labeling (CoNLL) | Completed      | Annotated dataset prepared in CoNLL format          |
+| ✅ Task 3: Model Fine-Tuning    | Completed      | - Fine-tuned XLM-R and mBERT models on Amharic NER data<br>- Used Hugging Face Trainer API with early stopping<br>- Achieved improved F1 scores vs baseline<br>- Logged training metrics & model artifacts in MLflow<br>- Stored model checkpoints via DVC for reproducibility |
+| ⬜ Task 4: Model Comparison     | Pending       |                                                    |
+| ⬜ Task 5: Interpretability     | Pending       |                                                    |
+| ⬜ Task 6: Vendor Scorecard     | Pending       |                                                    |
 
 ---
 
