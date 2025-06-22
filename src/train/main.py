@@ -17,8 +17,8 @@ import hydra
 from datasets import Dataset
 
 from data.conll_loader import load_conll_data
-from tokenizer_utils import prepare_tokenizer_and_align_labels
-from trainer import NERTrainer
+from train.tokenizer_utils import prepare_tokenizer_and_align_labels
+from train.trainer import NERTrainer
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 
 logger = logging.getLogger(__name__)
