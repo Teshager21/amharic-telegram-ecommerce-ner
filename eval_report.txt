@@ -1,0 +1,9 @@
+              precision    recall  f1-score   support
+
+         LOC       0.00      0.00      0.00       278
+       PRICE       0.00      0.00      0.00       454
+     PRODUCT       0.00      0.00      0.00       659
+
+   micro avg       0.00      0.00      0.00      1391
+   macro avg       0.00      0.00      0.00      1391
+weighted avg       0.00      0.00      0.00      1391

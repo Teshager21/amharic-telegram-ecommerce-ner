@@ -17,6 +17,8 @@ from transformers import (
     DataCollatorForTokenClassification,
     PreTrainedModel,
     PreTrainedTokenizerBase,
+    AutoTokenizer,
+    AutoModelForTokenClassification,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,10 +42,9 @@ class NERTrainer:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Base/default training arguments
         default_args = {
             "output_dir": str(self.output_dir),
-            "eval_strategy": "epoch",  # <-- Use eval_strategy here
+            "eval_strategy": "epoch",
             "save_strategy": "epoch",
             "logging_strategy": "steps",
             "logging_steps": 100,
@@ -56,7 +57,6 @@ class NERTrainer:
             "seed": 42,
         }
 
-        # Include evaluation-related settings only if eval set is provided
         if eval_dataset is not None:
             default_args.update(
                 {
@@ -66,9 +66,7 @@ class NERTrainer:
                 }
             )
 
-        # Update default_args with any user-provided args
         if training_args_dict:
-            # Directly update without converting keys
             default_args.update(training_args_dict)
 
         self.training_args = TrainingArguments(**default_args)
@@ -98,7 +96,6 @@ class NERTrainer:
         predictions = predictions.argmax(-1)
         id2label = self.model.config.id2label
 
-        # Remove ignored index (-100) and convert to string labels
         true_labels = [
             [id2label[int(label)] for label in label_seq if label != -100]
             for label_seq in labels
@@ -129,12 +126,7 @@ class NERTrainer:
         }
 
     def train(self):
-        """
-        Train the model and log with MLflow.
-        """
-        mlflow.set_experiment(
-            "NER_Training"
-        )  # 🔧 Use a valid experiment name, not "mlruns"
+        mlflow.set_experiment(self.mlflow_experiment_name)
         with mlflow.start_run():
             mlflow.log_param("epochs", self.training_args.num_train_epochs)
             mlflow.log_param("learning_rate", self.training_args.learning_rate)
@@ -145,11 +137,9 @@ class NERTrainer:
             logger.info("🚀 Starting training...")
             train_result = self.trainer.train()
 
-            # Save model and tokenizer explicitly to output_dir
             self.trainer.save_model(str(self.output_dir))
             self.tokenizer.save_pretrained(str(self.output_dir))
 
-            # Log model directory as MLflow artifact
             mlflow.log_artifacts(str(self.output_dir), artifact_path="model")
 
             metrics = train_result.metrics
@@ -158,9 +148,6 @@ class NERTrainer:
             return metrics
 
     def evaluate(self):
-        """
-        Evaluate the model on the evaluation dataset.
-        """
         if self.eval_dataset is None:
             logger.warning("⚠️ No evaluation dataset provided, skipping evaluation.")
             return None
@@ -171,17 +158,15 @@ class NERTrainer:
         return metrics
 
     def save_model(self):
-        """
-        Save model to output directory.
-        """
         logger.info(f"💾 Saving model to {self.output_dir}")
         self.trainer.save_model(self.output_dir)
-        # Log model directory as artifact
         mlflow.log_artifacts(self.output_dir, artifact_path="ner_model")
 
 
 if __name__ == "__main__":
     import argparse
+    from src.data.conll_loader import load_conll_data
+    from src.eval.evaluate import tokenize_and_align_labels
 
     logging.basicConfig(level=logging.INFO, format="🔥 [%(levelname)s] %(message)s")
 
@@ -193,7 +178,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--eval_file", type=str, help="Path to evaluation dataset")
     parser.add_argument(
-        "--model_name", type=str, default="xlm-roberta-base", help="Model name"
+        "--model_name", type=str, default="xlm-roberta-base", help="Base model name"
     )
     parser.add_argument(
         "--output_dir", type=str, default="models/ner", help="Output directory"
@@ -204,6 +189,41 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
 
     args = parser.parse_args()
-    logger.warning(
-        "⚠️ This CLI mode is a template and not integrated with Hydra config."
+
+    # ✅ Define 7-label list
+    LABEL_LIST = ["O", "B-PRODUCT", "I-PRODUCT", "B-PRICE", "I-PRICE", "B-LOC", "I-LOC"]
+    label2id = {label: i for i, label in enumerate(LABEL_LIST)}
+    id2label = {i: label for label, i in label2id.items()}
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForTokenClassification.from_pretrained(
+        args.model_name,
+        num_labels=len(LABEL_LIST),
+        label2id=label2id,
+        id2label=id2label,
     )
+
+    df_train = load_conll_data(args.train_file)
+    train_dataset = tokenize_and_align_labels(df_train, tokenizer, label2id)
+
+    eval_dataset = None
+    if args.eval_file:
+        df_eval = load_conll_data(args.eval_file)
+        eval_dataset = tokenize_and_align_labels(df_eval, tokenizer, label2id)
+
+    trainer = NERTrainer(
+        model=model,
+        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        output_dir=Path(args.output_dir),
+        training_args_dict={
+            "num_train_epochs": args.epochs,
+            "per_device_train_batch_size": args.batch_size,
+            "per_device_eval_batch_size": args.batch_size,
+        },
+    )
+
+    trainer.train()
+    if eval_dataset:
+        trainer.evaluate()
