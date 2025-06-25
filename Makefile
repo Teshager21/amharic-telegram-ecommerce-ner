@@ -151,3 +151,45 @@ fix-deps:
 	make clean
 	make init DEP_MANAGER=$(DEP_MANAGER)
 	@echo "✅ Fix-deps complete."
+
+# ======== CONFIGURATION ========
+MODEL_NAME=xlm-roberta-base
+MODEL_PATH=models/ner
+TRAIN_DATA_PATH=data/labeled/train_split.conll
+EVAL_DATA_PATH=data/labeled/eval_split.conll
+REPORT_PATH=reports/eval_report.txt
+BATCH_SIZE=16
+EPOCHS=3
+
+# ======== DEFAULT TARGET ========
+.PHONY: all
+all: train evaluate
+
+# ======== TRAIN TARGET ========
+.PHONY: train
+train:
+	@echo "🚀 Training NER model with ${MODEL_NAME}..."
+	python3 src/train/main.py \
+		model.name_or_path=${MODEL_NAME} \
+		training.epochs=${EPOCHS} \
+		training.batch_size=${BATCH_SIZE} \
+		training.eval_strategy=epoch \
+		data.train_file=${TRAIN_DATA_PATH} \
+		data.eval_file=${EVAL_DATA_PATH} \
+		output_dir=${MODEL_PATH} \
+		logging.level=INFO
+
+# ======== EVALUATE TARGET ========
+.PHONY: evaluate
+evaluate:
+	@echo "🔍 Evaluating NER model..."
+	@echo "⚡ Running quick evaluation with inline command..."
+		python3 -c "from src.eval.evaluate import evaluate; \
+	LABEL_LIST = ['B-PRODUCT', 'I-LOC', 'I-PRICE', 'I-PRODUCT', 'O']; \
+	evaluate(model_path='models/ner', data_path='data/labeled/eval_split.conll', label_list=LABEL_LIST)"
+
+# ======== SAVE PREDICTIONS TO CSV ========
+.PHONY: save_preds
+save_preds:
+	@echo "💾 Saving predictions to CSV..."
+	python3 src/eval/save_predictions_to_csv.py
