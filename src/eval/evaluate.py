@@ -23,6 +23,7 @@ from seqeval.metrics import (
     f1_score,
     accuracy_score,
 )
+from src.data.conll_loader import load_conll_data
 
 # Add project root folder to sys.path to allow imports to work
 project_root = pathlib.Path(__file__).parent.parent.resolve()
@@ -83,7 +84,7 @@ def evaluate(
         output_report_path: Optional path to save the
         classification report as a text file.
     """
-    from src.data.conll_loader import (
+    from data.conll_loader import (
         load_conll_data,
     )  # local import for notebook compatibility
 
@@ -178,6 +179,78 @@ def evaluate(
                     mlflow.log_artifact(str(output_report_path))
         except Exception as e:
             logger.warning(f"⚠️ MLflow logging failed: {e}")
+
+
+def evaluate_and_return_preds(
+    model_path: str,
+    data_path: str,
+    label_list: Optional[List[str]] = None,
+    batch_size: int = 16,
+    return_tokens: bool = False,
+):
+    """
+    Evaluate a fine-tuned NER model and return predictions and labels for CSV export.
+
+    Returns:
+        List[Dict] with keys: 'tokens', 'true_labels', 'pred_labels'
+    """
+
+    logger.info("📥 Loading dataset and model for prediction export...")
+    df = load_conll_data(data_path)
+    model = AutoModelForTokenClassification.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model.eval()
+
+    if label_list is None:
+        label_list = [
+            model.config.id2label[i] for i in range(len(model.config.id2label))
+        ]
+        logger.info(f"🔖 Using label list from model config: {label_list}")
+
+    label2id = {label: i for i, label in enumerate(label_list)}
+    id2label = {i: label for label, i in label2id.items()}
+
+    dataset = tokenize_and_align_labels(df, tokenizer, label2id)
+    dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
+
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size)
+
+    results = []
+    sentence_tokens = df.groupby("sentence_id")["token"].apply(list).tolist()
+    sent_idx = 0
+
+    for batch in dataloader:
+        with torch.no_grad():
+            outputs = model(
+                input_ids=batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+            )
+            logits = outputs.logits
+            predictions = torch.argmax(logits, dim=-1)
+
+        for b in range(len(batch["input_ids"])):
+            true_seq = []
+            pred_seq = []
+            # word_ids = batch["input_ids"][b]
+            labels = batch["labels"][b]
+            preds = predictions[b]
+
+            for pred_id, label_id in zip(preds, labels):
+                if label_id.item() != -100:
+                    true_seq.append(id2label[label_id.item()])
+                    pred_seq.append(id2label[pred_id.item()])
+
+            results.append(
+                {
+                    "tokens": sentence_tokens[sent_idx],
+                    "true_labels": true_seq,
+                    "pred_labels": pred_seq,
+                }
+            )
+            sent_idx += 1
+
+    logger.info("📦 Prediction export complete.")
+    return results
 
 
 if __name__ == "__main__":
